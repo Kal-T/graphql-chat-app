@@ -3,6 +3,9 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from 'src/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { Request, Response } from 'express';
+import { User } from 'src/user/user.type';
+import { LoginDto, RegisterDto } from './dto';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AuthService {
@@ -48,5 +51,61 @@ export class AuthService {
 
         res.cookie('access_token', accessToken, { httpOnly: true });
         return accessToken;
+    }
+
+    private async issueTokens(user: User, response: Response) {
+        const payload = { username: user.fullname, sub: user.id }
+
+        const accessToken = this.jwtService.sign(
+            { ...payload },
+            {
+                secret: this.configService.get<string>('ACCESS_TOKEN_SECRET'),
+                expiresIn: '150sec',
+            }
+        )
+        const refreshToken = this.jwtService.sign(payload, {
+            secret: this.configService.get<string>('REFERSH_TOKEN_SECRET'),
+            expiresIn: '7d',
+        })
+
+        response.cookie('access_token', accessToken, { httpOnly: true });
+        response.cookie('refresh_token', refreshToken, {
+            httpOnly: true
+        })
+
+        return { user };
+    }
+
+    async validateUser(loginDto: LoginDto) {
+        const user = await this.prisma.user.findUnique({
+            where: { email : loginDto.email },
+        })
+        if ( user && (await bcrypt.compare(loginDto.password, user.password))){
+            return user;
+        }
+        return null;
+    }
+
+    async register(registerDto : RegisterDto, response: Response) {
+        const existingUser = await this.prisma.user.findUnique({
+            where: { email : registerDto.email },
+        })
+
+        if (existingUser) {
+            throw new BadRequestException({ email : "Email already in use" }); 
+        }
+
+        const hashedPassword = await bcrypt.hash(registerDto.password, 10);
+
+        const user = await this.prisma.user.create({
+            data: {
+                fullname : registerDto.fullname,
+                password: hashedPassword,
+                email: registerDto.email,
+            }
+        })
+        
+        return this.issueTokens(user, response);
+        
     }
 }
