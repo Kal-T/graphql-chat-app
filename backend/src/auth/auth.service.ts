@@ -108,4 +108,20 @@ export class AuthService {
         return this.issueTokens(user, response);
         
     }
+
+    async login(loginDto: LoginDto, response: Response) {
+        const user = await this.validateUser(loginDto);
+        if(!user){
+            throw new BadRequestException({
+                invalidCredentials: 'Invalid Credentials',
+            });
+        }
+        return this.issueTokens(user, response);
+    }
+
+    async logout(response: Response){
+        response.clearCookie('access_token');
+        response.clearCookie('refresh_token');
+        return 'Successfully logged out';
+    }
 }
