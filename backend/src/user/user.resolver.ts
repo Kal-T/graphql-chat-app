@@ -13,7 +13,7 @@ import * as GraphQlUpload from 'graphql-upload/GraphQLUpload.js';
 export class UserResolver {
     constructor(private readonly userService: UserService){}
 
-    @UseGuards(GraphQlUpload)
+    @UseGuards(GraphqlAuthGuard)
     @Mutation(() => User)
     async updateProfile(
         @Args('fullname') fullname: string,
@@ -33,5 +33,6 @@ export class UserResolver {
         const imageUrl = `${process.env.APP_URL}/${uniqueFilename}`;
         const readStream = createReadStream();
         readStream.pipe(createWriteStream(imagePath));
+        return imageUrl;
     }
 }
